@@ -359,6 +359,7 @@ def build(ctx):
         ( "video/out/vo_xv.c",                   "xv" ),
         ( "video/out/w32_common.c",              "gdi" ),
         ( "video/out/wayland_common.c",          "wayland" ),
+        ( "video/out/wayland_xdg_shell_protocol.c",  "wayland" ),
         ( "video/out/x11_common.c",              "x11" ),
 
         ## osdep

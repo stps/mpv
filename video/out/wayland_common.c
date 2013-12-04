@@ -150,32 +150,68 @@ static const struct wl_display_listener display_listener = {
     display_handle_delete_id
 };
 
-static void ssurface_handle_ping(void *data,
-                                 struct wl_shell_surface *shell_surface,
-                                 uint32_t serial)
+static void xdg_handle_ping(void *data,
+                            struct xdg_surface *surface,
+                            uint32_t serial)
 {
-    wl_shell_surface_pong(shell_surface, serial);
+    xdg_surface_pong(surface, serial);
 }
 
-static void ssurface_handle_configure(void *data,
-                                      struct wl_shell_surface *shell_surface,
-                                      uint32_t edges,
-                                      int32_t width,
-                                      int32_t height)
+static void xdg_handle_configure(void *data,
+                                 struct xdg_surface *surface,
+                                 uint32_t edges,
+                                 int32_t width,
+                                 int32_t height)
 {
     struct vo_wayland_state *wl = data;
     shedule_resize(wl, edges, width, height);
 }
 
-static void ssurface_handle_popup_done(void *data,
-                                       struct wl_shell_surface *shell_surface)
+static void xdg_handle_request_set_fullscreen(void *data,
+                                              struct xdg_surface *surface)
+{
+    // compositor invoked fullscreen request
+}
+
+static void xdg_handle_request_unset_fullscreen(void *data,
+                                                struct xdg_surface *surface)
 {
 }
 
-static const struct wl_shell_surface_listener shell_surface_listener = {
-    ssurface_handle_ping,
-    ssurface_handle_configure,
-    ssurface_handle_popup_done
+static void xdg_handle_request_set_maximized(void *data,
+                                             struct xdg_surface *surface)
+{
+    // compositor invoked maximized request
+}
+
+static void xdg_handle_request_unset_maximized(void *data,
+                                               struct xdg_surface *surface)
+{
+}
+
+static void xdg_handle_focused_set(void *data,
+                                   struct xdg_surface *surface)
+{
+    struct vo_wayland_state *wl = data;
+    wl->window.has_focus = true;
+}
+
+static void xdg_handle_focused_unset(void *data,
+                                     struct xdg_surface *surface)
+{
+    struct vo_wayland_state *wl = data;
+    wl->window.has_focus = false;
+}
+
+const struct xdg_surface_listener xdg_surface_listener = {
+    xdg_handle_ping,
+    xdg_handle_configure,
+    xdg_handle_request_set_fullscreen,
+    xdg_handle_request_unset_fullscreen,
+    xdg_handle_request_set_maximized,
+    xdg_handle_request_unset_maximized,
+    xdg_handle_focused_set,
+    xdg_handle_focused_unset,
 };
 
 static void output_handle_geometry(void *data,
@@ -397,7 +433,7 @@ static void pointer_handle_button(void *data,
 
     if (!mp_input_test_dragging(wl->vo->input_ctx, wl->window.mouse_x, wl->window.mouse_y) &&
         (button == BTN_LEFT) && (state == WL_POINTER_BUTTON_STATE_PRESSED))
-        wl_shell_surface_move(wl->window.shell_surface, wl->input.seat, serial);
+        xdg_surface_move(wl->window.xdg_surface, wl->input.seat, serial);
 }
 
 static void pointer_handle_axis(void *data,
@@ -571,11 +607,6 @@ static void registry_handle_global (void *data,
                                                   &wl_compositor_interface, 1);
     }
 
-    else if (strcmp(interface, "wl_shell") == 0) {
-
-        wl->display.shell = wl_registry_bind(reg, id, &wl_shell_interface, 1);
-    }
-
     else if (strcmp(interface, "wl_shm") == 0) {
 
         wl->display.shm = wl_registry_bind(reg, id, &wl_shm_interface, 1);
@@ -610,6 +641,13 @@ static void registry_handle_global (void *data,
                 wl->input.devman, wl->input.seat);
         wl_data_device_add_listener(wl->input.datadev, &data_device_listener, wl);
     }
+
+    else if (strcmp(interface, "xdg_shell") == 0) {
+
+        wl->display.shell = wl_registry_bind(reg, id, &xdg_shell_interface, 1);
+        xdg_shell_use_unstable_version(wl->display.shell, XDG_SHELL_VERSION_CURRENT);
+    }
+
 }
 
 static void registry_handle_global_remove (void *data,
@@ -757,6 +795,8 @@ static bool create_display (struct vo_wayland_state *wl)
 
     wl->display.display_fd = wl_display_get_fd(wl->display.display);
 
+    printf("DISPLAY_FD: %d\n", wl->display.display_fd);
+
     return true;
 }
 
@@ -777,7 +817,7 @@ static void destroy_display (struct vo_wayland_state *wl)
         wl_shm_destroy(wl->display.shm);
 
     if (wl->display.shell)
-        wl_shell_destroy(wl->display.shell);
+        xdg_shell_destroy(wl->display.shell);
 
     if (wl->display.compositor)
         wl_compositor_destroy(wl->display.compositor);
@@ -794,27 +834,24 @@ static void destroy_display (struct vo_wayland_state *wl)
 static bool create_window (struct vo_wayland_state *wl)
 {
     wl->window.surface = wl_compositor_create_surface(wl->display.compositor);
-    wl->window.shell_surface = wl_shell_get_shell_surface(wl->display.shell,
-                                                          wl->window.surface);
+    wl->window.xdg_surface = xdg_shell_get_xdg_surface(wl->display.shell,
+                                                       wl->window.surface);
 
-    if (!wl->window.shell_surface) {
-        MP_ERR(wl, "creating shell surface failed\n");
+    if (!wl->window.xdg_surface) {
+        MP_ERR(wl, "creating xdg surface failed\n");
         return false;
     }
 
-    wl_shell_surface_add_listener(wl->window.shell_surface,
-                                  &shell_surface_listener, wl);
-
-    wl_shell_surface_set_toplevel(wl->window.shell_surface);
-    wl_shell_surface_set_class(wl->window.shell_surface, "mpv");
+    xdg_surface_add_listener(wl->window.xdg_surface, &xdg_surface_listener, wl);
+    xdg_surface_set_app_id(wl->window.xdg_surface, "mpv");
 
     return true;
 }
 
 static void destroy_window (struct vo_wayland_state *wl)
 {
-    if (wl->window.shell_surface)
-        wl_shell_surface_destroy(wl->window.shell_surface);
+    if (wl->window.xdg_surface)
+        xdg_surface_destroy(wl->window.xdg_surface);
 
     if (wl->window.surface)
         wl_surface_destroy(wl->window.surface);
@@ -948,22 +985,19 @@ static void vo_wayland_fullscreen (struct vo *vo)
     if (!wl->display.shell)
         return;
 
-    struct wl_output *fs_output = wl->display.fs_output;
 
     if (vo->opts->fullscreen) {
         MP_DBG(wl, "going fullscreen\n");
         wl->window.is_fullscreen = true;
         wl->window.p_width = wl->window.width;
         wl->window.p_height = wl->window.height;
-        wl_shell_surface_set_fullscreen(wl->window.shell_surface,
-                WL_SHELL_SURFACE_FULLSCREEN_METHOD_DEFAULT,
-                0, fs_output);
+        xdg_surface_set_fullscreen(wl->window.xdg_surface);
     }
 
     else {
         MP_DBG(wl, "leaving fullscreen\n");
         wl->window.is_fullscreen = false;
-        wl_shell_surface_set_toplevel(wl->window.shell_surface);
+        xdg_surface_unset_fullscreen(wl->window.xdg_surface);
         shedule_resize(wl, 0, wl->window.p_width, wl->window.p_height);
     }
 }
@@ -1107,6 +1141,8 @@ static void vo_wayland_update_screeninfo (struct vo *vo)
 
     wl->window.fs_width = opts->screenwidth;
     wl->window.fs_height = opts->screenheight;
+
+    xdg_surface_set_output(wl->window.xdg_surface, wl->display.fs_output);
 }
 
 int vo_wayland_control (struct vo *vo, int *events, int request, void *arg)
@@ -1156,7 +1192,7 @@ int vo_wayland_control (struct vo *vo, int *events, int request, void *arg)
         wl->cursor.visible = *(bool *)arg;
         return VO_TRUE;
     case VOCTRL_UPDATE_WINDOW_TITLE:
-        wl_shell_surface_set_title(wl->window.shell_surface, (char *) arg);
+        xdg_surface_set_title(wl->window.xdg_surface, (char *) arg);
         return VO_TRUE;
     }
     return VO_NOTIMPL;

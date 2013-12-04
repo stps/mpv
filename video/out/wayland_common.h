@@ -25,6 +25,8 @@
 #include <wayland-cursor.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include "wayland_xdg_shell_protocol.h"
+
 #include "config.h"
 
 #if HAVE_GL_WAYLAND
@@ -68,7 +70,8 @@ struct vo_wayland_state {
         struct wl_display *display;
         struct wl_registry *registry;
         struct wl_compositor *compositor;
-        struct wl_shell *shell;
+
+        struct xdg_shell *shell; // desktop interface
 
         struct wl_list output_list;
         struct wl_output *fs_output; /* fullscreen output */
@@ -91,14 +94,15 @@ struct vo_wayland_state {
         float aspect;
 
         bool is_init;       // true if the window has a valid size
+        bool has_focus;
         bool is_fullscreen; // don't keep aspect ratio in fullscreen mode
         int32_t fs_width;   // fullscreen sizes
         int32_t fs_height;
 
         struct wl_surface *surface;
+        struct xdg_surface *xdg_surface;
         int32_t mouse_x; // mouse position inside the surface
         int32_t mouse_y;
-        struct wl_shell_surface *shell_surface;
         int events; /* mplayer events (VO_EVENT_RESIZE) */
     } window;
 

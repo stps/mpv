@@ -89,8 +89,6 @@ struct vo_wayland_state {
         int32_t p_height;
         int32_t sh_width; // sheduled width for resizing
         int32_t sh_height;
-        int32_t sh_x;     // x, y calculated with the drag edges for moving
-        int32_t sh_y;
         float aspect;
 
         bool is_init;       // true if the window has a valid size

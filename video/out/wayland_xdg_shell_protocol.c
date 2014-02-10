@@ -45,6 +45,7 @@ static const struct wl_interface *types[] = {
 	NULL,
 	NULL,
 	NULL,
+	NULL,
 	&xdg_surface_interface,
 	&wl_surface_interface,
 	&xdg_popup_interface,
@@ -66,8 +67,8 @@ static const struct wl_interface *types[] = {
 
 static const struct wl_message xdg_shell_requests[] = {
 	{ "use_unstable_version", "i", types + 0 },
-	{ "get_xdg_surface", "no", types + 3 },
-	{ "get_xdg_popup", "nooouiiu", types + 5 },
+	{ "get_xdg_surface", "no", types + 4 },
+	{ "get_xdg_popup", "nooouiiu", types + 6 },
 };
 
 WL_EXPORT const struct wl_interface xdg_shell_interface = {
@@ -78,13 +79,14 @@ WL_EXPORT const struct wl_interface xdg_shell_interface = {
 
 static const struct wl_message xdg_surface_requests[] = {
 	{ "destroy", "", types + 0 },
-	{ "set_transient_for", "?o", types + 13 },
+	{ "set_transient_for", "?o", types + 14 },
+	{ "set_margin", "iiii", types + 0 },
 	{ "set_title", "s", types + 0 },
 	{ "set_app_id", "s", types + 0 },
 	{ "pong", "u", types + 0 },
-	{ "move", "ou", types + 14 },
-	{ "resize", "ouu", types + 16 },
-	{ "set_output", "?o", types + 19 },
+	{ "move", "ou", types + 15 },
+	{ "resize", "ouu", types + 17 },
+	{ "set_output", "?o", types + 20 },
 	{ "set_fullscreen", "", types + 0 },
 	{ "unset_fullscreen", "", types + 0 },
 	{ "set_maximized", "", types + 0 },
@@ -94,19 +96,20 @@ static const struct wl_message xdg_surface_requests[] = {
 
 static const struct wl_message xdg_surface_events[] = {
 	{ "ping", "u", types + 0 },
-	{ "configure", "uii", types + 0 },
+	{ "configure", "ii", types + 0 },
 	{ "request_set_fullscreen", "", types + 0 },
 	{ "request_unset_fullscreen", "", types + 0 },
 	{ "request_set_maximized", "", types + 0 },
 	{ "request_unset_maximized", "", types + 0 },
 	{ "focused_set", "", types + 0 },
 	{ "focused_unset", "", types + 0 },
+	{ "delete", "", types + 0 },
 };
 
 WL_EXPORT const struct wl_interface xdg_surface_interface = {
 	"xdg_surface", 1,
-	13, xdg_surface_requests,
-	8, xdg_surface_events,
+	14, xdg_surface_requests,
+	9, xdg_surface_events,
 };
 
 static const struct wl_message xdg_popup_requests[] = {

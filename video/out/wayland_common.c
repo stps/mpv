@@ -56,7 +56,6 @@ static int lookupkey(int key);
 static void hide_cursor(struct vo_wayland_state * wl);
 static void show_cursor(struct vo_wayland_state * wl);
 static void shedule_resize(struct vo_wayland_state *wl,
-                           uint32_t edges,
                            int32_t width,
                            int32_t height);
 
@@ -159,12 +158,11 @@ static void xdg_handle_ping(void *data,
 
 static void xdg_handle_configure(void *data,
                                  struct xdg_surface *surface,
-                                 uint32_t edges,
                                  int32_t width,
                                  int32_t height)
 {
     struct vo_wayland_state *wl = data;
-    shedule_resize(wl, edges, width, height);
+    shedule_resize(wl, width, height);
 }
 
 static void xdg_handle_request_set_fullscreen(void *data,
@@ -203,6 +201,12 @@ static void xdg_handle_focused_unset(void *data,
     wl->window.has_focus = false;
 }
 
+static void xdg_handle_delete(void *data, struct xdg_surface *surface)
+{
+    struct vo_wayland_state *wl = data;
+    mp_input_put_key(wl->vo->input_ctx, MP_KEY_CLOSE_WIN);
+}
+
 const struct xdg_surface_listener xdg_surface_listener = {
     xdg_handle_ping,
     xdg_handle_configure,
@@ -212,6 +216,7 @@ const struct xdg_surface_listener xdg_surface_listener = {
     xdg_handle_request_unset_maximized,
     xdg_handle_focused_set,
     xdg_handle_focused_unset,
+    xdg_handle_delete,
 };
 
 static void output_handle_geometry(void *data,
@@ -710,65 +715,14 @@ static void show_cursor (struct vo_wayland_state *wl)
 }
 
 static void shedule_resize(struct vo_wayland_state *wl,
-                           uint32_t edges,
                            int32_t width,
                            int32_t height)
 {
-    int32_t minimum_size = 150;
-    int32_t x, y;
-    float temp_aspect = width / (float) MPMAX(height, 1);
-
     MP_DBG(wl, "shedule resize: %dx%d\n", width, height);
-
-    if (width < minimum_size)
-        width = minimum_size;
-
-    if (height < minimum_size)
-        height = minimum_size;
-
-    // don't keep the aspect ration in fullscreen mode, because the compositor
-    // shows the desktop in the border regions if the video has not the same
-    // aspect ration as the screen
-    /* if only the height is changed we have to calculate the width
-     * in any other case we calculate the height */
-    switch (edges) {
-        case WL_SHELL_SURFACE_RESIZE_TOP:
-        case WL_SHELL_SURFACE_RESIZE_BOTTOM:
-            width = wl->window.aspect * height;
-            break;
-        case WL_SHELL_SURFACE_RESIZE_LEFT:
-        case WL_SHELL_SURFACE_RESIZE_RIGHT:
-        case WL_SHELL_SURFACE_RESIZE_TOP_LEFT:    // just a preference
-        case WL_SHELL_SURFACE_RESIZE_TOP_RIGHT:
-        case WL_SHELL_SURFACE_RESIZE_BOTTOM_LEFT:
-        case WL_SHELL_SURFACE_RESIZE_BOTTOM_RIGHT:
-            height = (1 / wl->window.aspect) * width;
-            break;
-        default:
-            if (wl->window.aspect < temp_aspect)
-                width = wl->window.aspect * height;
-            else
-                height = (1 / wl->window.aspect) * width;
-            break;
-    }
-
-    if (edges & WL_SHELL_SURFACE_RESIZE_LEFT)
-        x = wl->window.width - width;
-    else
-        x = 0;
-
-    if (edges & WL_SHELL_SURFACE_RESIZE_TOP)
-        y = wl->window.height - height;
-    else
-        y = 0;
 
     wl->window.sh_width = width;
     wl->window.sh_height = height;
-    wl->window.sh_x = x;
-    wl->window.sh_y = y;
     wl->window.events |= VO_EVENT_RESIZE;
-    wl->vo->dwidth = width;
-    wl->vo->dheight = height;
 }
 
 static bool create_display (struct vo_wayland_state *wl)
@@ -964,8 +918,8 @@ static void vo_wayland_ontop (struct vo *vo)
     struct vo_wayland_state *wl = vo->wayland;
     MP_DBG(wl, "going ontop\n");
     vo->opts->ontop = 1;
-    wl_shell_surface_set_toplevel(wl->window.shell_surface);
-    shedule_resize(wl, 0, wl->window.width, wl->window.height);
+    xdg_surface_unset_fullscreen(wl->window.xdg_surface);
+    shedule_resize(wl, wl->window.width, wl->window.height);
 }
 
 static void vo_wayland_border (struct vo *vo)
@@ -998,7 +952,7 @@ static void vo_wayland_fullscreen (struct vo *vo)
         MP_DBG(wl, "leaving fullscreen\n");
         wl->window.is_fullscreen = false;
         xdg_surface_unset_fullscreen(wl->window.xdg_surface);
-        shedule_resize(wl, 0, wl->window.p_width, wl->window.p_height);
+        shedule_resize(wl, wl->window.p_width, wl->window.p_height);
     }
 }
 
@@ -1177,7 +1131,7 @@ int vo_wayland_control (struct vo *vo, int *events, int request, void *arg)
     case VOCTRL_SET_WINDOW_SIZE: {
         int *s = arg;
         if (!wl->window.is_fullscreen)
-            shedule_resize(wl, 0, s[0], s[1]);
+            shedule_resize(wl, s[0], s[1]);
         return VO_TRUE;
     }
     case VOCTRL_SET_CURSOR_VISIBILITY:
@@ -1215,7 +1169,7 @@ bool vo_wayland_config (struct vo *vo, uint32_t d_width,
 
         if (vo->opts->fullscreen) {
             if (wl->window.is_fullscreen)
-                shedule_resize(wl, 0, wl->window.fs_width, wl->window.fs_height);
+                shedule_resize(wl, wl->window.fs_width, wl->window.fs_height);
             else
                 vo_wayland_fullscreen(vo);
         }

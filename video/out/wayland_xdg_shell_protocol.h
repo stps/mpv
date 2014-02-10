@@ -157,6 +157,7 @@ enum xdg_surface_resize_edge {
  *	maximized
  * @focused_set: surface was focused
  * @focused_unset: surface was unfocused
+ * @delete: surface wants to be closed
  *
  * An interface that may be implemented by a wl_surface, for
  * implementations that provide a desktop-style user interface.
@@ -182,7 +183,6 @@ struct xdg_surface_listener {
 		     uint32_t serial);
 	/**
 	 * configure - suggest resize
-	 * @edges: (none)
 	 * @width: (none)
 	 * @height: (none)
 	 *
@@ -206,7 +206,6 @@ struct xdg_surface_listener {
 	 */
 	void (*configure)(void *data,
 			  struct xdg_surface *xdg_surface,
-			  uint32_t edges,
 			  int32_t width,
 			  int32_t height);
 	/**
@@ -266,6 +265,20 @@ struct xdg_surface_listener {
 	 */
 	void (*focused_unset)(void *data,
 			      struct xdg_surface *xdg_surface);
+	/**
+	 * delete - surface wants to be closed
+	 *
+	 * The delete event is sent by the compositor when the user wants
+	 * the surface to be closed. This should be equivalent to the user
+	 * clicking the close button in client-side decorations, if your
+	 * application has any...
+	 *
+	 * This is only a request that the user intends to close your
+	 * window. The client may choose to ignore this request, or show a
+	 * dialog to ask the user to save their data...
+	 */
+	void (*delete)(void *data,
+		       struct xdg_surface *xdg_surface);
 };
 
 static inline int
@@ -278,17 +291,18 @@ xdg_surface_add_listener(struct xdg_surface *xdg_surface,
 
 #define XDG_SURFACE_DESTROY	0
 #define XDG_SURFACE_SET_TRANSIENT_FOR	1
-#define XDG_SURFACE_SET_TITLE	2
-#define XDG_SURFACE_SET_APP_ID	3
-#define XDG_SURFACE_PONG	4
-#define XDG_SURFACE_MOVE	5
-#define XDG_SURFACE_RESIZE	6
-#define XDG_SURFACE_SET_OUTPUT	7
-#define XDG_SURFACE_SET_FULLSCREEN	8
-#define XDG_SURFACE_UNSET_FULLSCREEN	9
-#define XDG_SURFACE_SET_MAXIMIZED	10
-#define XDG_SURFACE_UNSET_MAXIMIZED	11
-#define XDG_SURFACE_SET_MINIMIZED	12
+#define XDG_SURFACE_SET_MARGIN	2
+#define XDG_SURFACE_SET_TITLE	3
+#define XDG_SURFACE_SET_APP_ID	4
+#define XDG_SURFACE_PONG	5
+#define XDG_SURFACE_MOVE	6
+#define XDG_SURFACE_RESIZE	7
+#define XDG_SURFACE_SET_OUTPUT	8
+#define XDG_SURFACE_SET_FULLSCREEN	9
+#define XDG_SURFACE_UNSET_FULLSCREEN	10
+#define XDG_SURFACE_SET_MAXIMIZED	11
+#define XDG_SURFACE_UNSET_MAXIMIZED	12
+#define XDG_SURFACE_SET_MINIMIZED	13
 
 static inline void
 xdg_surface_set_user_data(struct xdg_surface *xdg_surface, void *user_data)
@@ -316,6 +330,13 @@ xdg_surface_set_transient_for(struct xdg_surface *xdg_surface, struct wl_surface
 {
 	wl_proxy_marshal((struct wl_proxy *) xdg_surface,
 			 XDG_SURFACE_SET_TRANSIENT_FOR, parent);
+}
+
+static inline void
+xdg_surface_set_margin(struct xdg_surface *xdg_surface, int32_t left_margin, int32_t right_margin, int32_t top_margin, int32_t bottom_margin)
+{
+	wl_proxy_marshal((struct wl_proxy *) xdg_surface,
+			 XDG_SURFACE_SET_MARGIN, left_margin, right_margin, top_margin, bottom_margin);
 }
 
 static inline void

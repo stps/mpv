@@ -16,42 +16,36 @@
  * with mpv.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "sub/osd.h"
+
 #include "wayland_common.h"
 #include "gl_common.h"
 
 static void egl_resize(struct vo_wayland_state *wl)
 {
-    int32_t x = wl->window.sh_x;
-    int32_t y = wl->window.sh_y;
-    int32_t width = wl->window.sh_width;
-    int32_t height = wl->window.sh_height;
+    int32_t width = 0;
+    int32_t height = 0;
 
-    // get the real size of the window
-    // this improves moving the window while resizing it
-    wl_egl_window_get_attached_size(wl->egl_context.egl_window,
-                                    &wl->window.width,
-                                    &wl->window.height);
+    wl->vo->dwidth = wl->window.sh_width;
+    wl->vo->dheight = wl->window.sh_height;
+    wl->vo->dx = 0;
+    wl->vo->dy = 0;
+
+    struct mp_rect src, dst;
+    struct mp_osd_res osd;
+    vo_get_src_dst_rects(wl->vo, &src, &dst, &osd);
+    width = dst.x1 - dst.x0;
+    height= dst.y1 - dst.y0;
 
     MP_VERBOSE(wl, "resizing %dx%d -> %dx%d\n", wl->window.width,
                                                 wl->window.height,
                                                 width,
                                                 height);
 
-    if (x != 0)
-        x = wl->window.width - width;
-
-    if (y != 0)
-        y = wl->window.height - height;
-
-    wl_egl_window_resize(wl->egl_context.egl_window, width, height, x, y);
+    wl_egl_window_resize(wl->egl_context.egl_window, width, height, 0, 0);
 
     wl->window.width = width;
     wl->window.height = height;
-
-    /* set size for mplayer */
-    wl->vo->dwidth = wl->window.width;
-    wl->vo->dheight = wl->window.height;
-
     wl->vo->want_redraw = true;
     wl->window.events = 0;
 }

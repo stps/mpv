@@ -2190,6 +2190,8 @@ static int get_track_entry(int item, int action, void *arg, void *ctx)
                         .unavailable = track->ff_index == -1},
         {"hls-bitrate", SUB_PROP_INT(track->hls_bitrate),
                         .unavailable = !track->hls_bitrate},
+        {"hls-playlist-id", SUB_PROP_INT(track->hls_playlist_id),
+                            .unavailable = track->hls_playlist_id < 0},
         {"program-id",  SUB_PROP_INT(sh && sh->num_program_ids ? sh->program_ids[0] : -1),
                         .unavailable = !sh || !sh->num_program_ids},
         {"program-ids", SUB_PROP_INT_ARRAY(sh ? sh->program_ids : NULL,

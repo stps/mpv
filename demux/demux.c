@@ -1008,6 +1008,7 @@ struct sh_stream *demux_alloc_sh_stream(enum stream_type type)
         .index = -1,
         .ff_index = -1,     // may be overwritten by demuxer
         .demuxer_id = -1,   // ... same
+        .hls_playlist_id = -1,
         .codec = talloc_zero(sh, struct mp_codec_params),
         .tags = talloc_zero(sh, struct mp_tags),
     };
@@ -1403,6 +1404,7 @@ static struct sh_stream *demuxer_get_cc_track_locked(struct sh_stream *stream)
         sh->hls_bitrate = stream->hls_bitrate;
         for (int i = 0; i < stream->num_program_ids; i++)
             MP_TARRAY_APPEND(sh, sh->program_ids, sh->num_program_ids, stream->program_ids[i]);
+        sh->hls_playlist_id = stream->hls_playlist_id;
         stream->ds->cc = sh;
         demux_add_sh_stream_locked(stream->ds->in, sh);
         sh->ds->ignore_eof = true;

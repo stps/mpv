@@ -118,6 +118,7 @@ struct track {
     int demuxer_id; // same as stream->demuxer_id. -1 if not set.
     int ff_index; // same as stream->ff_index, or 0.
     int hls_bitrate; // same as stream->hls_bitrate. 0 if not set.
+    int hls_playlist_id; // same as stream->hls_playlist_id. -1 if not set.
 
     char *title;
     bool default_track, forced_track, dependent_track;

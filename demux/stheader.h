@@ -70,6 +70,7 @@ struct sh_stream {
     bool still_image;           // video consists of multiple sparse still images
     bool absent;                // the media provides no data for this stream
     int hls_bitrate;
+    int hls_playlist_id; // HLS media playlist index, or -1 if unavailable.
     int *program_ids;
     int num_program_ids;
 

@@ -3610,6 +3610,14 @@ Property list
     ``track-list/N/hls-bitrate``
         The bitrate of the HLS stream, if available.
 
+    ``track-list/N/hls-playlist-id``
+        The index of the HLS Media Playlist supplying this track. Tracks with
+        the same index in the same demuxer originate from the same playlist,
+        even if they belong to multiple Variant Streams. This is distinct from
+        ``program-id``, which identifies a variant. The index is local to the
+        loaded input and is not stable across reloads. Unavailable for non-HLS
+        inputs.
+
     ``track-list/N/program-id``
         The first program ID this stream belongs to, if any. Deprecated,
         use ``track-list/N/program-ids``.
@@ -3743,6 +3751,7 @@ Property list
                 "visual-impaired"   MPV_FORMAT_FLAG
                 "hearing-impaired"  MPV_FORMAT_FLAG
                 "hls-bitrate"       MPV_FORMAT_INT64
+                "hls-playlist-id"   MPV_FORMAT_INT64
                 "program-id"        MPV_FORMAT_INT64
                 "program-ids"       MPV_FORMAT_NODE_ARRAY[MPV_FORMAT_INT64]
                 "selected"          MPV_FORMAT_FLAG

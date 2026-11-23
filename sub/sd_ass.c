@@ -61,6 +61,7 @@ struct sd_ass_priv {
     struct seen_packet *seen_packets;
     int num_seen_packets;
     bool check_animated;
+    int visual_order_balance;
 };
 
 struct seen_packet {
@@ -366,6 +367,58 @@ static bool is_animated(const char *str)
     return false;
 }
 
+static bool is_sentence_punctuation(char c)
+{
+    return c == '.' || c == ',' || c == '?' || c == '!';
+}
+
+static bstr strip_ass_line(bstr line)
+{
+    while (true) {
+        line = bstr_strip(line);
+        if (bstr_startswith0(line, "{")) {
+            int end = bstrchr(line, '}');
+            if (end < 0)
+                break;
+            line = bstr_cut(line, end + 1);
+        } else if (bstr_endswith0(line, "}")) {
+            int start = bstrrchr(line, '{');
+            if (start < 0)
+                break;
+            line = bstr_splice(line, 0, start);
+        } else {
+            break;
+        }
+    }
+    return line;
+}
+
+// Plaintext RTL subtitles authored for VSFilter-style renderers often store
+// lines in visual order: sentence punctuation is placed at the logical start
+// so that it appears at the end with an LTR base direction. Normal text has it
+// at the end instead, so a track where more lines start with punctuation than
+// end with it is treated as visual order. Ellipses are ignored because they
+// appear at either end in both orders.
+static void update_visual_order_balance(struct sd_ass_priv *ctx, ASS_Event *event)
+{
+    bool visual_order = ctx->visual_order_balance > 0;
+    bstr text = bstr0(event->Text);
+    while (text.len) {
+        bstr line;
+        bstr_split_tok(text, "\\N", &line, &text);
+        line = strip_ass_line(line);
+        if (line.len < 2)
+            continue;
+        if (is_sentence_punctuation(line.start[0]) && line.start[1] != '.')
+            ctx->visual_order_balance++;
+        if (is_sentence_punctuation(line.start[line.len - 1]) &&
+            line.start[line.len - 2] != '.')
+            ctx->visual_order_balance--;
+    }
+    if ((ctx->visual_order_balance > 0) != visual_order)
+        ctx->ass_configured = false;
+}
+
 // Note: pkt is not necessarily a fully valid refcounted packet.
 static void filter_and_add(struct sd *sd, struct demux_packet *pkt)
 {
@@ -391,6 +444,11 @@ static void filter_and_add(struct sd *sd, struct demux_packet *pkt)
         talloc_free(pkt);
     // the seen and animated state is kept on the original packet
     pkt = orig_pkt;
+
+    if (ctx->is_converted) {
+        for (int n = old_n_events; n < track->n_events; n++)
+            update_visual_order_balance(ctx, &track->events[n]);
+    }
 
     // This bookkeeping only has any practical use for ASS subs
     // over a VO with no video.
@@ -616,14 +674,15 @@ static void configure_ass(struct sd *sd, struct mp_osd_res *dim,
     ass_set_line_spacing(priv, set_line_spacing);
 #if LIBASS_VERSION >= 0x01600010
     if (converted) {
+        bool bidi_compat = opts->sub_vsfilter_bidi_compat || ctx->visual_order_balance > 0;
         ass_track_set_feature(track, ASS_FEATURE_WRAP_UNICODE, 1);
-        if (!opts->sub_vsfilter_bidi_compat) {
-            for (int n = 0; n < track->n_styles; n++) {
-                track->styles[n].Encoding = -1;
-            }
-            ass_track_set_feature(track, ASS_FEATURE_BIDI_BRACKETS, 1);
-            ass_track_set_feature(track, ASS_FEATURE_WHOLE_TEXT_LAYOUT, 1);
+        // libass uses Encoding only to pick the base direction: -1 is auto,
+        // anything else is LTR.
+        for (int n = 0; n < track->n_styles; n++) {
+            track->styles[n].Encoding = bidi_compat ? 1 : -1;
         }
+        ass_track_set_feature(track, ASS_FEATURE_BIDI_BRACKETS, !bidi_compat);
+        ass_track_set_feature(track, ASS_FEATURE_WHOLE_TEXT_LAYOUT, !bidi_compat);
     }
 #endif
     if (converted) {
